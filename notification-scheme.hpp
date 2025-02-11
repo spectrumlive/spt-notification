@@ -31,7 +31,7 @@
 #if !ENABLE_LOCAL_FILE_URL_SCHEME
 class NotificationSchemeHandlerFactory : public CefSchemeHandlerFactory {
 public:
-	virtual CefRefPtr<CefResourceHandler> Create(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame>,
+	virtual CefRefPtr<CefResourceHandler> Create(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>,
 						     const CefString &, CefRefPtr<CefRequest> request) override;
 
 	IMPLEMENT_REFCOUNTING(NotificationSchemeHandlerFactory);

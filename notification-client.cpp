@@ -71,7 +71,7 @@ CefRefPtr<CefRequestHandler> NotificationClient::GetRequestHandler()
 	return this;
 }
 
-CefRefPtr<CefResourceRequestHandler> NotificationClient::GetResourceRequestHandler(CefRefPtr<CefNotification>,
+CefRefPtr<CefResourceRequestHandler> NotificationClient::GetResourceRequestHandler(CefRefPtr<CefBrowser>,
 									      CefRefPtr<CefFrame>,
 									      CefRefPtr<CefRequest> request, bool, bool,
 									      const CefString &, bool &)
@@ -83,7 +83,7 @@ CefRefPtr<CefResourceRequestHandler> NotificationClient::GetResourceRequestHandl
 	return nullptr;
 }
 
-CefResourceRequestHandler::ReturnValue NotificationClient::OnBeforeResourceLoad(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>,
+CefResourceRequestHandler::ReturnValue NotificationClient::OnBeforeResourceLoad(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>,
 									   CefRefPtr<CefRequest>,
 									   CefRefPtr<CefCallback>)
 {
@@ -91,22 +91,22 @@ CefResourceRequestHandler::ReturnValue NotificationClient::OnBeforeResourceLoad(
 }
 #endif
 
-bool NotificationClient::OnBeforePopup(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>, const CefString &, const CefString &,
+bool NotificationClient::OnBeforePopup(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const CefString &, const CefString &,
 				  cef_window_open_disposition_t, bool, const CefPopupFeatures &, CefWindowInfo &,
-				  CefRefPtr<CefClient> &, CefNotificationSettings &, CefRefPtr<CefDictionaryValue> &, bool *)
+				  CefRefPtr<CefClient> &, CefBrowserSettings &, CefRefPtr<CefDictionaryValue> &, bool *)
 {
 	/* block popups */
 	return true;
 }
 
-void NotificationClient::OnBeforeContextMenu(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>, CefRefPtr<CefContextMenuParams>,
+void NotificationClient::OnBeforeContextMenu(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefContextMenuParams>,
 					CefRefPtr<CefMenuModel> model)
 {
 	/* remove all context menu contributions */
 	model->Clear();
 }
 
-bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame>, CefProcessId,
+bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>, CefProcessId,
 					     CefRefPtr<CefProcessMessage> message)
 {
 	const std::string &name = message->GetName();
@@ -145,7 +145,7 @@ bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> not
 			obs_frontend_replay_buffer_stop();
 		} else if (name == "setCurrentScene") {
 			const std::string scene_name = input_args->GetString(1).ToString();
-			SPTSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
+			OBSSourceAutoRelease source = obs_get_source_by_name(scene_name.c_str());
 			if (!source) {
 				blog(LOG_WARNING,
 				     "Notification source '%s' tried to switch to scene '%s' which doesn't exist",
@@ -161,7 +161,7 @@ bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> not
 			obs_frontend_source_list transitions = {};
 			obs_frontend_get_transitions(&transitions);
 
-			SPTSourceAutoRelease transition;
+			OBSSourceAutoRelease transition;
 			for (size_t i = 0; i < transitions.sources.num; i++) {
 				obs_source_t *source = transitions.sources.array[i];
 				if (obs_source_get_name(source) == transition_name) {
@@ -197,7 +197,7 @@ bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> not
 			json = scenes_vector;
 			obs_frontend_source_list_free(&list);
 		} else if (name == "getCurrentScene") {
-			SPTSourceAutoRelease current_scene = obs_frontend_get_current_scene();
+			OBSSourceAutoRelease current_scene = obs_frontend_get_current_scene();
 
 			if (!current_scene)
 				return false;
@@ -220,7 +220,7 @@ bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> not
 			json = transitions_vector;
 			obs_frontend_source_list_free(&list);
 		} else if (name == "getCurrentTransition") {
-			SPTSourceAutoRelease source = obs_frontend_get_current_transition();
+         OBSSourceAutoRelease source = obs_frontend_get_current_transition();
 			json = obs_source_get_name(source);
 		}
 		[[fallthrough]];
@@ -250,7 +250,7 @@ bool NotificationClient::OnProcessMessageReceived(CefRefPtr<CefNotification> not
 	return true;
 }
 
-void NotificationClient::GetViewRect(CefRefPtr<CefNotification>, CefRect &rect)
+void NotificationClient::GetViewRect(CefRefPtr<CefBrowser>, CefRect &rect)
 {
 	if (!valid()) {
 		rect.Set(0, 0, 16, 16);
@@ -260,7 +260,7 @@ void NotificationClient::GetViewRect(CefRefPtr<CefNotification>, CefRect &rect)
 	rect.Set(0, 0, bs->width < 1 ? 1 : bs->width, bs->height < 1 ? 1 : bs->height);
 }
 
-bool NotificationClient::OnTooltip(CefRefPtr<CefNotification>, CefString &text)
+bool NotificationClient::OnTooltip(CefRefPtr<CefBrowser>, CefString &text)
 {
 	std::string str_text = text;
 	QMetaObject::invokeMethod(QCoreApplication::instance()->thread(),
@@ -268,7 +268,7 @@ bool NotificationClient::OnTooltip(CefRefPtr<CefNotification>, CefString &text)
 	return true;
 }
 
-void NotificationClient::OnPaint(CefRefPtr<CefNotification>, PaintElementType type, const RectList &, const void *buffer,
+void NotificationClient::OnPaint(CefRefPtr<CefBrowser>, PaintElementType type, const RectList &, const void *buffer,
 			    int width, int height)
 {
 	if (type != PET_VIEW) {
@@ -276,7 +276,7 @@ void NotificationClient::OnPaint(CefRefPtr<CefNotification>, PaintElementType ty
 		return;
 	}
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 	if (sharing_available) {
 		return;
 	}
@@ -305,7 +305,7 @@ void NotificationClient::OnPaint(CefRefPtr<CefNotification>, PaintElementType ty
 	}
 }
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 void NotificationClient::UpdateExtraTexture()
 {
 	if (bs->texture) {
@@ -336,7 +336,7 @@ void NotificationClient::UpdateExtraTexture()
 	}
 }
 
-void NotificationClient::OnAcceleratedPaint(CefRefPtr<CefNotification>, PaintElementType type, const RectList &,
+void NotificationClient::OnAcceleratedPaint(CefRefPtr<CefBrowser>, PaintElementType type, const RectList &,
 #if CHROME_VERSION_BUILD >= 6367
 				       const CefAcceleratedPaintInfo &info)
 #else
@@ -397,7 +397,7 @@ void NotificationClient::OnAcceleratedPaint(CefRefPtr<CefNotification>, PaintEle
 }
 
 #ifdef CEF_ON_ACCELERATED_PAINT2
-void NotificationClient::OnAcceleratedPaint2(CefRefPtr<CefNotification>, PaintElementType type, const RectList &,
+void NotificationClient::OnAcceleratedPaint2(CefRefPtr<CefBrowser>, PaintElementType type, const RectList &,
 					void *shared_handle, bool new_texture)
 {
 	if (type != PET_VIEW) {
@@ -466,7 +466,7 @@ static speaker_layout GetSpeakerLayout(CefAudioHandler::ChannelLayout cefLayout)
 }
 
 #if CHROME_VERSION_BUILD >= 4103
-void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefNotification> notification, const CefAudioParameters &params_,
+void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> notification, const CefAudioParameters &params_,
 					 int channels_)
 {
 	UNUSED_PARAMETER(notification);
@@ -476,7 +476,7 @@ void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefNotification> notific
 	frames_per_buffer = params_.frames_per_buffer;
 }
 
-void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefNotification> notification, const float **data, int frames, int64_t pts)
+void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefBrowser> notification, const float **data, int frames, int64_t pts)
 {
 	UNUSED_PARAMETER(notification);
 	if (!valid()) {
@@ -496,14 +496,14 @@ void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefNotification> notifica
 	obs_source_output_audio(bs->source, &audio);
 }
 
-void NotificationClient::OnAudioStreamStopped(CefRefPtr<CefNotification> notification)
+void NotificationClient::OnAudioStreamStopped(CefRefPtr<CefBrowser> notification)
 {
 	UNUSED_PARAMETER(notification);
 }
 
-void NotificationClient::OnAudioStreamError(CefRefPtr<CefNotification> notification, const CefString &message)
+void NotificationClient::OnAudioStreamError(CefRefPtr<CefBrowser> notification, const CefString &message)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	UNUSED_PARAMETER(message);
 }
 
@@ -529,9 +529,9 @@ static CefAudioHandler::ChannelLayout Convert2CEFSpeakerLayout(int channels)
 	}
 }
 
-bool NotificationClient::GetAudioParameters(CefRefPtr<CefNotification> browser, CefAudioParameters &params)
+bool NotificationClient::GetAudioParameters(CefRefPtr<CefBrowser> notification, CefAudioParameters &params)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	int channels = (int)audio_output_get_channels(obs_get_audio());
 	params.channel_layout = Convert2CEFSpeakerLayout(channels);
 	params.sample_rate = (int)audio_output_get_sample_rate(obs_get_audio());
@@ -539,10 +539,10 @@ bool NotificationClient::GetAudioParameters(CefRefPtr<CefNotification> browser, 
 	return true;
 }
 #elif CHROME_VERSION_BUILD < 4103
-void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefNotification> browser, int id, int, ChannelLayout channel_layout,
+void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefBrowser> notification, int id, int, ChannelLayout channel_layout,
 					 int sample_rate, int)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	if (!valid()) {
 		return;
 	}
@@ -562,10 +562,10 @@ void NotificationClient::OnAudioStreamStarted(CefRefPtr<CefNotification> browser
 	stream.sample_rate = sample_rate;
 }
 
-void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefNotification> browser, int id, const float **data, int frames,
+void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefBrowser> notification, int id, const float **data, int frames,
 					int64_t pts)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	if (!valid()) {
 		return;
 	}
@@ -586,9 +586,9 @@ void NotificationClient::OnAudioStreamPacket(CefRefPtr<CefNotification> browser,
 	obs_source_output_audio(stream.source, &audio);
 }
 
-void NotificationClient::OnAudioStreamStopped(CefRefPtr<CefNotification> browser, int id)
+void NotificationClient::OnAudioStreamStopped(CefRefPtr<CefBrowser> notification, int id)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	if (!valid()) {
 		return;
 	}
@@ -613,7 +613,7 @@ void NotificationClient::OnAudioStreamStopped(CefRefPtr<CefNotification> browser
 }
 #endif
 
-void NotificationClient::OnLoadEnd(CefRefPtr<CefNotification>, CefRefPtr<CefFrame> frame, int)
+void NotificationClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, int)
 {
 	if (!valid()) {
 		return;
@@ -633,7 +633,7 @@ void NotificationClient::OnLoadEnd(CefRefPtr<CefNotification>, CefRefPtr<CefFram
 	}
 }
 
-bool NotificationClient::OnConsoleMessage(CefRefPtr<CefNotification>, cef_log_severity_t level, const CefString &message,
+bool NotificationClient::OnConsoleMessage(CefRefPtr<CefBrowser>, cef_log_severity_t level, const CefString &message,
 				     const CefString &source, int line)
 {
 	int errorLevel = LOG_INFO;

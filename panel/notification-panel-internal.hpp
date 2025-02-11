@@ -2,7 +2,7 @@
 
 #include <QTimer>
 #include <QPointer>
-#include "browser-panel.hpp"
+#include "notification-panel.hpp"
 #include "cef-headers.hpp"
 
 #include <vector>
@@ -28,7 +28,7 @@ public:
 	QCefWidgetInternal(QWidget *parent, const std::string &url, CefRefPtr<CefRequestContext> rqc);
 	~QCefWidgetInternal();
 
-	CefRefPtr<CefNotification> cefNotification;
+	CefRefPtr<CefBrowser> cefNotification;
 	std::string url;
 	std::string script;
 	CefRefPtr<CefRequestContext> rqc;

@@ -21,7 +21,7 @@
 #include <include/wrapper/cef_stream_resource_handler.h>
 
 #if !ENABLE_LOCAL_FILE_URL_SCHEME
-CefRefPtr<CefResourceHandler> NotificationSchemeHandlerFactory::Create(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame>,
+CefRefPtr<CefResourceHandler> NotificationSchemeHandlerFactory::Create(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>,
 								  const CefString &, CefRefPtr<CefRequest> request)
 {
 	if (!notification || !request)

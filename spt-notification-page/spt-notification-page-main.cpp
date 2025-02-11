@@ -17,7 +17,7 @@
  ******************************************************************************/
 
 #include "cef-headers.hpp"
-#include "browser-app.hpp"
+#include "notification-app.hpp"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -33,22 +33,22 @@ extern "C" __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
 static HANDLE shutdown_event = nullptr;
 static bool thread_initialized = false;
 
-DECLARE_HANDLE(SPT_DPI_AWARENESS_CONTEXT);
-#define SPT_DPI_AWARENESS_CONTEXT_UNAWARE ((SPT_DPI_AWARENESS_CONTEXT)-1)
-#define SPT_DPI_AWARENESS_CONTEXT_SYSTEM_AWARE ((SPT_DPI_AWARENESS_CONTEXT)-2)
-#define SPT_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE ((SPT_DPI_AWARENESS_CONTEXT)-3)
-#define SPT_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((SPT_DPI_AWARENESS_CONTEXT)-4)
+DECLARE_HANDLE(OBS_DPI_AWARENESS_CONTEXT);
+#define OBS_DPI_AWARENESS_CONTEXT_UNAWARE ((OBS_DPI_AWARENESS_CONTEXT)-1)
+#define OBS_DPI_AWARENESS_CONTEXT_SYSTEM_AWARE ((OBS_DPI_AWARENESS_CONTEXT)-2)
+#define OBS_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE ((OBS_DPI_AWARENESS_CONTEXT)-3)
+#define OBS_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((OBS_DPI_AWARENESS_CONTEXT)-4)
 
 static bool SetHighDPIv2Scaling()
 {
-	static BOOL(WINAPI * func)(SPT_DPI_AWARENESS_CONTEXT) = nullptr;
+	static BOOL(WINAPI * func)(OBS_DPI_AWARENESS_CONTEXT) = nullptr;
 	func = reinterpret_cast<decltype(func)>(
 		GetProcAddress(GetModuleHandleW(L"USER32"), "SetProcessDpiAwarenessContext"));
 	if (!func) {
 		return false;
 	}
 
-	return !!func(SPT_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+	return !!func(OBS_DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 }
 
 static void shutdown_check_thread(DWORD parent_pid, DWORD main_thread_id)
@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
 	int ret = CefExecuteProcess(mainArgs, mainApp.get(), NULL);
 
 #ifdef _WIN32
-	/* chromium browser subprocesses actually have TerminateProcess called
+	/* chromium notification subprocesses actually have TerminateProcess called
 	 * on them for whatever reason, so it's unlikely this code will ever
 	 * get called, but better to be safe than sorry */
 	if (thread_initialized) {

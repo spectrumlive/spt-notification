@@ -1,4 +1,4 @@
-#include "browser-panel-client.hpp"
+#include "notification-panel-client.hpp"
 #include <util/dstr.h>
 
 #include <QUrl>
@@ -28,50 +28,50 @@
 #define MENU_ITEM_COPY_URL MENU_ID_CUSTOM_FIRST + 5
 
 /* CefClient */
-CefRefPtr<CefLoadHandler> QCefNotificationClient::GetLoadHandler()
+CefRefPtr<CefLoadHandler> QCefBrowserClient::GetLoadHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefDisplayHandler> QCefNotificationClient::GetDisplayHandler()
+CefRefPtr<CefDisplayHandler> QCefBrowserClient::GetDisplayHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefRequestHandler> QCefNotificationClient::GetRequestHandler()
+CefRefPtr<CefRequestHandler> QCefBrowserClient::GetRequestHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefLifeSpanHandler> QCefNotificationClient::GetLifeSpanHandler()
+CefRefPtr<CefLifeSpanHandler> QCefBrowserClient::GetLifeSpanHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefFocusHandler> QCefNotificationClient::GetFocusHandler()
+CefRefPtr<CefFocusHandler> QCefBrowserClient::GetFocusHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefContextMenuHandler> QCefNotificationClient::GetContextMenuHandler()
+CefRefPtr<CefContextMenuHandler> QCefBrowserClient::GetContextMenuHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefKeyboardHandler> QCefNotificationClient::GetKeyboardHandler()
+CefRefPtr<CefKeyboardHandler> QCefBrowserClient::GetKeyboardHandler()
 {
 	return this;
 }
 
-CefRefPtr<CefJSDialogHandler> QCefNotificationClient::GetJSDialogHandler()
+CefRefPtr<CefJSDialogHandler> QCefBrowserClient::GetJSDialogHandler()
 {
 	return this;
 }
 
 /* CefDisplayHandler */
-void QCefNotificationClient::OnTitleChange(CefRefPtr<CefNotification> browser, const CefString &title)
+void QCefBrowserClient::OnTitleChange(CefRefPtr<CefBrowser> notification, const CefString &title)
 {
-	if (widget && widget->cefNotification->IsSame(browser)) {
+	if (widget && widget->cefNotification->IsSame(notification)) {
 		std::string str_title = title;
 		QString qt_title = QString::fromUtf8(str_title.c_str());
 		QMetaObject::invokeMethod(widget, "titleChanged", Q_ARG(QString, qt_title));
@@ -84,18 +84,18 @@ void QCefNotificationClient::OnTitleChange(CefRefPtr<CefNotification> browser, c
 					   .constData();
 
 #if defined(_WIN32)
-		CefWindowHandle handl = browser->GetHost()->GetWindowHandle();
+		CefWindowHandle handl = notification->GetHost()->GetWindowHandle();
 		std::wstring str_title = newTitle;
 		SetWindowTextW((HWND)handl, str_title.c_str());
 #elif defined(__linux__)
-		CefWindowHandle handl = browser->GetHost()->GetWindowHandle();
+		CefWindowHandle handl = notification->GetHost()->GetWindowHandle();
 		XStoreName(cef_get_xdisplay(), handl, newTitle.ToString().c_str());
 #endif
 	}
 }
 
 /* CefRequestHandler */
-bool QCefNotificationClient::OnBeforeBrowse(CefRefPtr<CefNotification> browser, CefRefPtr<CefFrame>,
+bool QCefBrowserClient::OnBeforeBrowse(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>,
 				       CefRefPtr<CefRequest> request, bool, bool)
 {
 	std::string str_url = request->GetURL();
@@ -110,10 +110,10 @@ bool QCefNotificationClient::OnBeforeBrowse(CefRefPtr<CefNotification> browser, 
 		}
 
 		if (astrcmpi(info.url.c_str(), str_url.c_str()) == 0) {
-			/* Open tab popup URLs in user's actual browser */
+			/* Open tab popup URLs in user's actual notification */
 			QUrl url = QUrl(str_url.c_str(), QUrl::TolerantMode);
 			QDesktopServices::openUrl(url);
-			browser->GoBack();
+			notification->GoBack();
 			return true;
 		}
 	}
@@ -125,22 +125,22 @@ bool QCefNotificationClient::OnBeforeBrowse(CefRefPtr<CefNotification> browser, 
 	return false;
 }
 
-bool QCefNotificationClient::OnOpenURLFromTab(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>, const CefString &target_url,
+bool QCefBrowserClient::OnOpenURLFromTab(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const CefString &target_url,
 					 CefRequestHandler::WindowOpenDisposition, bool)
 {
 	std::string str_url = target_url;
 
-	/* Open tab popup URLs in user's actual browser */
+	/* Open tab popup URLs in user's actual notification */
 	QUrl url = QUrl(str_url.c_str(), QUrl::TolerantMode);
 	QDesktopServices::openUrl(url);
 	return true;
 }
 
-void QCefNotificationClient::OnLoadError(CefRefPtr<CefNotification> browser, CefRefPtr<CefFrame> frame,
+void QCefBrowserClient::OnLoadError(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame,
 				    CefLoadHandler::ErrorCode errorCode, const CefString &errorText,
 				    const CefString &failedUrl)
 {
-	UNUSED_PARAMETER(browser);
+	UNUSED_PARAMETER(notification);
 	if (errorCode == ERR_ABORTED)
 		return;
 
@@ -172,10 +172,10 @@ void QCefNotificationClient::OnLoadError(CefRefPtr<CefNotification> browser, Cef
 }
 
 /* CefLifeSpanHandler */
-bool QCefNotificationClient::OnBeforePopup(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>, const CefString &target_url,
+bool QCefBrowserClient::OnBeforePopup(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, const CefString &target_url,
 				      const CefString &, CefLifeSpanHandler::WindowOpenDisposition, bool,
 				      const CefPopupFeatures &, CefWindowInfo &windowInfo, CefRefPtr<CefClient> &,
-				      CefNotificationSettings &, CefRefPtr<CefDictionaryValue> &, bool *)
+				      CefBrowserSettings &, CefRefPtr<CefDictionaryValue> &, bool *)
 {
 	if (allowAllPopups) {
 #ifdef _WIN32
@@ -207,23 +207,23 @@ bool QCefNotificationClient::OnBeforePopup(CefRefPtr<CefNotification>, CefRefPtr
 		}
 	}
 
-	/* Open popup URLs in user's actual browser */
+	/* Open popup URLs in user's actual notification */
 	QUrl url = QUrl(str_url.c_str(), QUrl::TolerantMode);
 	QDesktopServices::openUrl(url);
 	return true;
 }
 
-void QCefNotificationClient::OnBeforeClose(CefRefPtr<CefNotification>)
+void QCefBrowserClient::OnBeforeClose(CefRefPtr<CefBrowser>)
 {
 	if (widget) {
 		widget->CloseSafely();
 	}
 }
 
-bool QCefNotificationClient::OnSetFocus(CefRefPtr<CefNotification>, CefFocusHandler::FocusSource source)
+bool QCefBrowserClient::OnSetFocus(CefRefPtr<CefBrowser>, CefFocusHandler::FocusSource source)
 {
 	/* Don't steal focus when the webpage navigates. This is especially
-	   obvious on startup when the user has many browser docks defined,
+	   obvious on startup when the user has many notification docks defined,
 	   as each one will steal focus one by one, resulting in poor UX.
 	 */
 	switch (source) {
@@ -234,7 +234,7 @@ bool QCefNotificationClient::OnSetFocus(CefRefPtr<CefNotification>, CefFocusHand
 	}
 }
 
-void QCefNotificationClient::OnBeforeContextMenu(CefRefPtr<CefNotification> browser, CefRefPtr<CefFrame>,
+void QCefBrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>,
 					    CefRefPtr<CefContextMenuParams>, CefRefPtr<CefMenuModel> model)
 {
 	if (model->IsVisible(MENU_ID_BACK) &&
@@ -248,7 +248,7 @@ void QCefNotificationClient::OnBeforeContextMenu(CefRefPtr<CefNotification> brow
 		model->Remove(MENU_ID_VIEW_SOURCE);
 	}
 	model->AddItem(MENU_ITEM_ZOOM_IN, obs_module_text("Zoom.In"));
-	if (browser->GetHost()->GetZoomLevel() != 0) {
+	if (notification->GetHost()->GetZoomLevel() != 0) {
 		model->AddItem(MENU_ITEM_ZOOM_RESET, obs_module_text("Zoom.Reset"));
 	}
 	model->AddItem(MENU_ITEM_ZOOM_OUT, obs_module_text("Zoom.Out"));
@@ -256,11 +256,11 @@ void QCefNotificationClient::OnBeforeContextMenu(CefRefPtr<CefNotification> brow
 	model->InsertItemAt(model->GetCount(), MENU_ITEM_COPY_URL, obs_module_text("CopyUrl"));
 	model->InsertItemAt(model->GetCount(), MENU_ITEM_DEVTOOLS, obs_module_text("Inspect"));
 	model->InsertCheckItemAt(model->GetCount(), MENU_ITEM_MUTE, QObject::tr("Mute").toUtf8().constData());
-	model->SetChecked(MENU_ITEM_MUTE, browser->GetHost()->IsAudioMuted());
+	model->SetChecked(MENU_ITEM_MUTE, notification->GetHost()->IsAudioMuted());
 }
 
 #if defined(_WIN32)
-bool QCefNotificationClient::RunContextMenu(CefRefPtr<CefNotification>, CefRefPtr<CefFrame>, CefRefPtr<CefContextMenuParams>,
+bool QCefBrowserClient::RunContextMenu(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame>, CefRefPtr<CefContextMenuParams>,
 				       CefRefPtr<CefMenuModel> model, CefRefPtr<CefRunContextMenuCallback> callback)
 {
 	std::vector<std::tuple<std::string, int, bool, int, bool>> menu_items;
@@ -310,13 +310,13 @@ bool QCefNotificationClient::RunContextMenu(CefRefPtr<CefNotification>, CefRefPt
 }
 #endif
 
-bool QCefNotificationClient::OnContextMenuCommand(CefRefPtr<CefNotification> browser, CefRefPtr<CefFrame>,
+bool QCefBrowserClient::OnContextMenuCommand(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>,
 					     CefRefPtr<CefContextMenuParams> params, int command_id,
 					     CefContextMenuHandler::EventFlags)
 {
 	if (command_id < MENU_ID_CUSTOM_FIRST)
 		return false;
-	CefRefPtr<CefNotificationHost> host = browser->GetHost();
+	CefRefPtr<CefBrowserHost> host = notification->GetHost();
 	CefWindowInfo windowInfo;
 	QPoint pos;
 	switch (command_id) {
@@ -329,7 +329,7 @@ bool QCefNotificationClient::OnContextMenuCommand(CefRefPtr<CefNotification> bro
 		windowInfo.bounds.y = pos.y() + 30;
 		windowInfo.bounds.width = 900;
 		windowInfo.bounds.height = 700;
-		host->ShowDevTools(windowInfo, host->GetClient(), CefNotificationSettings(),
+		host->ShowDevTools(windowInfo, host->GetClient(), CefBrowserSettings(),
 				   {params.get()->GetXCoord(), params.get()->GetYCoord()});
 		return true;
 	case MENU_ITEM_MUTE:
@@ -345,7 +345,7 @@ bool QCefNotificationClient::OnContextMenuCommand(CefRefPtr<CefNotification> bro
 		widget->zoomPage(-1);
 		return true;
 	case MENU_ITEM_COPY_URL:
-		std::string url = browser->GetMainFrame()->GetURL().ToString();
+		std::string url = notification->GetMainFrame()->GetURL().ToString();
 		auto saveClipboard = [url]() {
 			QClipboard *clipboard = QApplication::clipboard();
 
@@ -362,19 +362,19 @@ bool QCefNotificationClient::OnContextMenuCommand(CefRefPtr<CefNotification> bro
 	return false;
 }
 
-void QCefNotificationClient::OnLoadStart(CefRefPtr<CefNotification>, CefRefPtr<CefFrame> frame, TransitionType)
+void QCefBrowserClient::OnLoadStart(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, TransitionType)
 {
 	if (!frame->IsMain())
 		return;
 
 	std::string script = "window.close = () => ";
 	script += "console.log(";
-	script += "'SPT browser docks cannot be closed using JavaScript.'";
+	script += "'SPT notification docks cannot be closed using JavaScript.'";
 	script += ");";
 	frame->ExecuteJavaScript(script, "", 0);
 }
 
-void QCefNotificationClient::OnLoadEnd(CefRefPtr<CefNotification>, CefRefPtr<CefFrame> frame, int)
+void QCefBrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, int)
 {
 	if (!frame->IsMain())
 		return;
@@ -385,7 +385,7 @@ void QCefNotificationClient::OnLoadEnd(CefRefPtr<CefNotification>, CefRefPtr<Cef
 		frame->ExecuteJavaScript(script, CefString(), 0);
 }
 
-bool QCefNotificationClient::OnJSDialog(CefRefPtr<CefNotification>, const CefString &,
+bool QCefBrowserClient::OnJSDialog(CefRefPtr<CefBrowser>, const CefString &,
 				   CefJSDialogHandler::JSDialogType dialog_type, const CefString &message_text,
 				   const CefString &default_prompt_text, CefRefPtr<CefJSDialogCallback> callback,
 				   bool &)
@@ -459,7 +459,7 @@ bool QCefNotificationClient::OnJSDialog(CefRefPtr<CefNotification>, const CefStr
 	return true;
 }
 
-bool QCefNotificationClient::OnPreKeyEvent(CefRefPtr<CefNotification> browser, const CefKeyEvent &event, CefEventHandle, bool *)
+bool QCefBrowserClient::OnPreKeyEvent(CefRefPtr<CefBrowser> notification, const CefKeyEvent &event, CefEventHandle, bool *)
 {
 	if (event.type != KEYEVENT_RAWKEYDOWN)
 		return false;
@@ -470,7 +470,7 @@ bool QCefNotificationClient::OnPreKeyEvent(CefRefPtr<CefNotification> browser, c
 #else
 	    (event.modifiers & EVENTFLAG_CONTROL_DOWN) != 0) {
 #endif
-		browser->ReloadIgnoreCache();
+		notification->ReloadIgnoreCache();
 		return true;
 	} else if ((event.windows_key_code == 189 || event.windows_key_code == 109) &&
 		   (event.modifiers & EVENTFLAG_CONTROL_DOWN) != 0) {

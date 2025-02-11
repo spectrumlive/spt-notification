@@ -13,7 +13,7 @@ find_package(CEF 95 REQUIRED)
 find_package(nlohmann_json 3.11 REQUIRED)
 
 add_library(spt-notification MODULE)
-add_library(SPT::notification ALIAS spt-notification)
+add_library(OBS::notification ALIAS spt-notification)
 
 option(ENABLE_NOTIFICATION_PANELS "Enable Qt web notification panel support" ON)
 mark_as_advanced(ENABLE_NOTIFICATION_PANELS)
@@ -43,7 +43,7 @@ target_sources(
 target_include_directories(spt-notification PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/deps")
 
 target_compile_features(spt-notification PRIVATE cxx_std_17)
-target_link_libraries(spt-notification PRIVATE SPT::libobs SPT::frontend-api SPT::websocket-api nlohmann_json::nlohmann_json)
+target_link_libraries(spt-notification PRIVATE OBS::libobs OBS::frontend-api OBS::websocket-api nlohmann_json::nlohmann_json)
 
 if(OS_WINDOWS)
   include(cmake/os-windows.cmake)

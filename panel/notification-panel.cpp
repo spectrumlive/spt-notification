@@ -1,7 +1,7 @@
-#include "browser-panel-internal.hpp"
-#include "browser-panel-client.hpp"
+#include "notification-panel-internal.hpp"
+#include "notification-panel-client.hpp"
 #include "cef-headers.hpp"
-#include "browser-app.hpp"
+#include "notification-app.hpp"
 
 #include <QWindow>
 #include <QApplication>
@@ -26,7 +26,7 @@
 #endif
 
 extern bool QueueCEFTask(std::function<void()> task);
-extern "C" void obs_browser_initialize(void);
+extern "C" void spt_notification_initialize(void);
 extern os_event_t *cef_started_event;
 
 std::mutex popup_whitelist_mutex;
@@ -158,13 +158,13 @@ QCefWidgetInternal::~QCefWidgetInternal()
 
 void QCefWidgetInternal::closeNotification()
 {
-	CefRefPtr<CefNotification> browser = cefNotification;
-	if (!!browser) {
-		auto destroyNotification = [=](CefRefPtr<CefNotification> cefNotification) {
+	CefRefPtr<CefBrowser> notification = cefNotification;
+	if (!!notification) {
+		auto destroyNotification = [=](CefRefPtr<CefBrowser> cefNotification) {
 			CefRefPtr<CefClient> client = cefNotification->GetHost()->GetClient();
-			QCefNotificationClient *bc = reinterpret_cast<QCefNotificationClient *>(client.get());
+			QCefBrowserClient *bc = reinterpret_cast<QCefBrowserClient *>(client.get());
 
-			cefNotification->GetHost()->CloseNotification(true);
+			cefNotification->GetHost()->CloseBrowser(true);
 
 #if !defined(_WIN32) && !defined(__APPLE__) && CHROME_VERSION_BUILD >= 6533
 			QEventLoop loop;
@@ -181,20 +181,20 @@ void QCefWidgetInternal::closeNotification()
 		};
 
 		/* So you're probably wondering what's going on here.  If you
-		 * call CefNotificationHost::CloseNotification, and it fails to unload
-		 * the web page *before* WM_NCDESTROY is called on the browser
+		 * call CefBrowserHost::CloseNotification, and it fails to unload
+		 * the web page *before* WM_NCDESTROY is called on the notification
 		 * HWND, it will call an internal CEF function
-		 * CefNotificationPlatformDelegateNativeWin::CloseHostWindow, which
-		 * will attempt to close the browser's main window itself.
+		 * CefBrowserPlatformDelegateNativeWin::CloseHostWindow, which
+		 * will attempt to close the notification's main window itself.
 		 * Problem is, this closes the root window containing the
-		 * browser's HWND rather than the browser's specific HWND for
-		 * whatever mysterious reason.  If the browser is in a dock
+		 * notification's HWND rather than the notification's specific HWND for
+		 * whatever mysterious reason.  If the notification is in a dock
 		 * widget, then the window it closes is, unfortunately, the
 		 * main program's window, causing the entire program to shut
 		 * down.
 		 *
-		 * So, instead, before closing the browser, we need to decouple
-		 * the browser from the widget.  To do this, we hide it, then
+		 * So, instead, before closing the notification, we need to decouple
+		 * the notification from the widget.  To do this, we hide it, then
 		 * remove its parent. */
 #ifdef _WIN32
 		HWND hwnd = (HWND)cefNotification->GetHost()->GetWindowHandle();
@@ -209,8 +209,8 @@ void QCefWidgetInternal::closeNotification()
 			((void (*)(id, SEL))objc_msgSend)((id)view, sel_getUid("removeFromSuperview"));
 #endif
 
-		destroyNotification(browser);
-		browser = nullptr;
+		destroyNotification(notification);
+		notification = nullptr;
 		cefNotification = nullptr;
 	}
 }
@@ -237,7 +237,7 @@ static bool XWindowHasAtom(Display *display, Window w, Atom a)
 /* On Linux / X11, CEF sets the XdndProxy of the toplevel window
  * it's attached to, so that it can read drag events. When this
  * toplevel happens to be SPT Studio's main window (e.g. when a
- * browser panel is docked into to the main window), setting the
+ * notification panel is docked into to the main window), setting the
  * XdndProxy atom ends up breaking DnD of sources and scenes. Thus,
  * we have to manually unset this atom.
  */
@@ -246,13 +246,13 @@ void QCefWidgetInternal::unsetToplevelXdndProxy()
 	if (!cefNotification)
 		return;
 
-	CefWindowHandle browserHandle = cefNotification->GetHost()->GetWindowHandle();
+	CefWindowHandle notificationHandle = cefNotification->GetHost()->GetWindowHandle();
 	Display *xDisplay = cef_get_xdisplay();
 	Window toplevel, root, parent, *children;
 	unsigned int nChildren;
 	bool found = false;
 
-	toplevel = browserHandle;
+	toplevel = notificationHandle;
 
 	// Find the toplevel
 	Atom netWmPidAtom = XInternAtom(xDisplay, "_NET_WM_PID", False);
@@ -328,11 +328,11 @@ void QCefWidgetInternal::Init()
 			windowInfo.SetAsChild((CefWindowHandle)handle, CefRect(0, 0, size.width(), size.height()));
 #endif
 
-			CefRefPtr<QCefNotificationClient> browserClient =
-				new QCefNotificationClient(this, script, allowAllPopups_);
+			CefRefPtr<QCefBrowserClient> notificationClient =
+				new QCefBrowserClient(this, script, allowAllPopups_);
 
-			CefNotificationSettings cefNotificationSettings;
-			cefNotification = CefNotificationHost::CreateNotificationSync(windowInfo, browserClient, url,
+			CefBrowserSettings cefNotificationSettings;
+			cefNotification = CefBrowserHost::CreateBrowserSync(windowInfo, notificationClient, url,
 								       cefNotificationSettings,
 								       CefRefPtr<CefDictionaryValue>(), rqc);
 
@@ -411,7 +411,7 @@ void QCefWidgetInternal::showEvent(QShowEvent *event)
 	QWidget::showEvent(event);
 
 	if (!cefNotification) {
-		obs_browser_initialize();
+		spt_notification_initialize();
 		connect(&timer, &QTimer::timeout, this, &QCefWidgetInternal::Init);
 		timer.start(500);
 		Init();
@@ -462,7 +462,7 @@ bool QCefWidgetInternal::zoomPage(int direction)
 	if (!cefNotification || direction < -1 || direction > 1)
 		return false;
 
-	CefRefPtr<CefNotificationHost> host = cefNotification->GetHost();
+	CefRefPtr<CefBrowserHost> host = cefNotification->GetHost();
 	if (direction == 0) {
 		// Reset zoom
 		host->SetZoomLevel(0);
@@ -503,9 +503,9 @@ bool QCefWidgetInternal::zoomPage(int direction)
 /* ------------------------------------------------------------------------- */
 
 struct QCefInternal : QCef {
-	virtual bool init_browser(void) override;
+	virtual bool init_notification(void) override;
 	virtual bool initialized(void) override;
-	virtual bool wait_for_browser_init(void) override;
+	virtual bool wait_for_notification_init(void) override;
 
 	virtual QCefWidget *create_widget(QWidget *parent, const std::string &url,
 					  QCefCookieManager *cookie_manager) override;
@@ -519,12 +519,12 @@ struct QCefInternal : QCef {
 	virtual void add_force_popup_url(const std::string &url, QObject *obj) override;
 };
 
-bool QCefInternal::init_browser(void)
+bool QCefInternal::init_notification(void)
 {
 	if (os_event_try(cef_started_event) == 0)
 		return true;
 
-	obs_browser_initialize();
+	spt_notification_initialize();
 	return false;
 }
 
@@ -533,7 +533,7 @@ bool QCefInternal::initialized(void)
 	return os_event_try(cef_started_event) == 0;
 }
 
-bool QCefInternal::wait_for_browser_init(void)
+bool QCefInternal::wait_for_notification_init(void)
 {
 	return os_event_wait(cef_started_event) == 0;
 }
@@ -573,14 +573,14 @@ void QCefInternal::add_force_popup_url(const std::string &url, QObject *obj)
 	forced_popups.emplace_back(url, obj);
 }
 
-extern "C" EXPORT QCef *obs_browser_create_qcef(void)
+extern "C" EXPORT QCef *spt_notification_create_qcef(void)
 {
 	return new QCefInternal();
 }
 
 #define NOTIFICATION_PANEL_VERSION 3
 
-extern "C" EXPORT int obs_browser_qcef_version_export(void)
+extern "C" EXPORT int spt_notification_qcef_version_export(void)
 {
 	return NOTIFICATION_PANEL_VERSION;
 }

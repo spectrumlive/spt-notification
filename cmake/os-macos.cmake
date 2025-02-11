@@ -1,6 +1,6 @@
 find_package(Qt6 REQUIRED Widgets)
 
-target_compile_definitions(spt-notification PRIVATE ENABLE_NOTIFICATION_SHARED_TEXTURE ENABLE_NOTIFICATION_QT_LOOP)
+target_compile_definitions(spt-notification PRIVATE ENABLE_BROWSER_SHARED_TEXTURE ENABLE_NOTIFICATION_QT_LOOP)
 
 if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 14.0.3)
   target_compile_options(spt-notification PRIVATE -Wno-error=unqualified-std-cast-call)
@@ -9,7 +9,7 @@ endif()
 target_link_libraries(spt-notification PRIVATE Qt::Widgets CEF::Wrapper "$<LINK_LIBRARY:FRAMEWORK,CoreFoundation.framework>"
                                           "$<LINK_LIBRARY:FRAMEWORK,AppKit.framework>")
 
-set(helper_basename browser-helper)
+set(helper_basename notification-helper)
 set(helper_output_name "SPECTRUMLiveStudio Helper")
 set(helper_suffixes "::" " (GPU):_gpu:.gpu" " (Plugin):_plugin:.plugin" " (Renderer):_renderer:.renderer")
 
@@ -27,13 +27,13 @@ foreach(helper IN LISTS helper_suffixes)
   configure_file(cmake/macos/Info-helper.plist.in Info-Helper${helper_plist}.plist)
 
   add_executable(${target_name} MACOSX_BUNDLE EXCLUDE_FROM_ALL)
-  add_executable(SPT::${target_name} ALIAS ${target_name})
+  add_executable(OBS::${target_name} ALIAS ${target_name})
 
   target_sources(
     ${target_name} PRIVATE # cmake-format: sortable
-                           browser-app.cpp browser-app.hpp cef-headers.hpp spt-notification-page/spt-notification-page-main.cpp)
+                           notification-app.cpp notification-app.hpp cef-headers.hpp spt-notification-page/spt-notification-page-main.cpp)
 
-  target_compile_definitions(${target_name} PRIVATE ENABLE_NOTIFICATION_SHARED_TEXTURE)
+  target_compile_definitions(${target_name} PRIVATE ENABLE_BROWSER_SHARED_TEXTURE)
 
   if(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL 14.0.3)
     target_compile_options(${target_name} PRIVATE -Wno-error=unqualified-std-cast-call)

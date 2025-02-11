@@ -23,7 +23,7 @@
 #include <functional>
 #include "cef-headers.hpp"
 
-typedef std::function<void(CefRefPtr<CefNotification>)> NotificationFunc;
+typedef std::function<void(CefRefPtr<CefBrowser>)> NotificationFunc;
 
 #ifdef ENABLE_NOTIFICATION_QT_LOOP
 #include <QObject>
@@ -36,14 +36,14 @@ typedef std::function<void()> MessageTask;
 class MessageObject : public QObject {
 	Q_OBJECT
 
-	friend void QueueNotificationTask(CefRefPtr<CefNotification> notification, NotificationFunc func);
+	friend void QueueNotificationTask(CefRefPtr<CefBrowser> notification, NotificationFunc func);
 
 	struct Task {
-		CefRefPtr<CefNotification> notification;
+		CefRefPtr<CefBrowser> notification;
 		NotificationFunc func;
 
 		inline Task() {}
-		inline Task(CefRefPtr<CefNotification> notification_, NotificationFunc func_) : notification(notification_), func(func_) {}
+		inline Task(CefRefPtr<CefBrowser> notification_, NotificationFunc func_) : notification(notification_), func(func_) {}
 	};
 
 	std::mutex notificationTaskMutex;
@@ -56,12 +56,12 @@ public slots:
 	void Process();
 };
 
-extern void QueueNotificationTask(CefRefPtr<CefNotification> notification, NotificationFunc func);
+extern void QueueNotificationTask(CefRefPtr<CefBrowser> notification, NotificationFunc func);
 #endif
 
-class NotificationApp : public CefApp, public CefRenderProcessHandler, public CefNotificationProcessHandler, public CefV8Handler {
+class NotificationApp : public CefApp, public CefRenderProcessHandler, public CefBrowserProcessHandler, public CefV8Handler {
 
-	void ExecuteJSFunction(CefRefPtr<CefNotification> notification, const char *functionName, CefV8ValueList arguments);
+	void ExecuteJSFunction(CefRefPtr<CefBrowser> notification, const char *functionName, CefV8ValueList arguments);
 
 	typedef std::map<int, CefRefPtr<CefV8Value>> CallbackMap;
 
@@ -84,14 +84,14 @@ public:
 	}
 
 	virtual CefRefPtr<CefRenderProcessHandler> GetRenderProcessHandler() override;
-	virtual CefRefPtr<CefNotificationProcessHandler> GetNotificationProcessHandler() override;
+	virtual CefRefPtr<CefBrowserProcessHandler> GetBrowserProcessHandler() override;
 	virtual void OnBeforeChildProcessLaunch(CefRefPtr<CefCommandLine> command_line) override;
 	virtual void OnRegisterCustomSchemes(CefRawPtr<CefSchemeRegistrar> registrar) override;
 	virtual void OnBeforeCommandLineProcessing(const CefString &process_type,
 						   CefRefPtr<CefCommandLine> command_line) override;
-	virtual void OnContextCreated(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame> frame,
+	virtual void OnContextCreated(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame,
 				      CefRefPtr<CefV8Context> context) override;
-	virtual bool OnProcessMessageReceived(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame> frame,
+	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame,
 					      CefProcessId source_process,
 					      CefRefPtr<CefProcessMessage> message) override;
 	virtual bool Execute(const CefString &name, CefRefPtr<CefV8Value> object, const CefV8ValueList &arguments,
@@ -109,8 +109,8 @@ public:
 #if !ENABLE_WASHIDDEN
 	std::unordered_map<int, bool> notificationVis;
 
-	void SetFrameDocumentVisibility(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame> frame, bool isVisible);
-	void SetDocumentVisibility(CefRefPtr<CefNotification> notification, bool isVisible);
+	void SetFrameDocumentVisibility(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame, bool isVisible);
+	void SetDocumentVisibility(CefRefPtr<CefBrowser> notification, bool isVisible);
 #endif
 
 	IMPLEMENT_REFCOUNTING(NotificationApp);

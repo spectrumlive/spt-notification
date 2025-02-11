@@ -55,8 +55,8 @@
 #include <QThread>
 #endif
 
-SPT_DECLARE_MODULE()
-SPT_MODULE_USE_DEFAULT_LOCALE("spt-notification", "en-US")
+OBS_DECLARE_MODULE()
+OBS_MODULE_USE_DEFAULT_LOCALE("spt-notification", "en-US")
 MODULE_EXPORT const char *obs_module_description(void)
 {
 	return "CEF-based web notification source & panels";
@@ -122,7 +122,7 @@ static void notification_source_get_defaults(obs_data_t *settings)
 	obs_data_set_default_int(settings, "width", 800);
 	obs_data_set_default_int(settings, "height", 600);
 	obs_data_set_default_int(settings, "fps", 30);
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 	obs_data_set_default_bool(settings, "fps_custom", false);
 #else
 	obs_data_set_default_bool(settings, "fps_custom", true);
@@ -160,7 +160,7 @@ static obs_properties_t *notification_source_get_properties(void *data)
 	NotificationSource *bs = static_cast<NotificationSource *>(data);
 	DStr path;
 
-	obs_properties_set_flags(props, SPT_PROPERTIES_DEFER_UPDATE);
+	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
 	obs_property_t *prop = obs_properties_add_bool(props, "is_local_file", obs_module_text("LocalFile"));
 
 	if (bs && !bs->url.empty()) {
@@ -174,8 +174,8 @@ static obs_properties_t *notification_source_get_properties(void *data)
 	}
 
 	obs_property_set_modified_callback(prop, is_local_file_modified);
-	obs_properties_add_path(props, "local_file", obs_module_text("LocalFile"), SPT_PATH_FILE, "*.*", path->array);
-	obs_properties_add_text(props, "url", obs_module_text("URL"), SPT_TEXT_DEFAULT);
+	obs_properties_add_path(props, "local_file", obs_module_text("LocalFile"), OBS_PATH_FILE, "*.*", path->array);
+	obs_properties_add_text(props, "url", obs_module_text("URL"), OBS_TEXT_DEFAULT);
 
 	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
 	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
@@ -185,20 +185,20 @@ static obs_properties_t *notification_source_get_properties(void *data)
 	obs_property_t *fps_set = obs_properties_add_bool(props, "fps_custom", obs_module_text("CustomFrameRate"));
 	obs_property_set_modified_callback(fps_set, is_fps_custom);
 
-#ifndef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifndef ENABLE_BROWSER_SHARED_TEXTURE
 	obs_property_set_enabled(fps_set, false);
 #endif
 
 	obs_properties_add_int(props, "fps", obs_module_text("FPS"), 1, 60, 1);
 
-	obs_property_t *p = obs_properties_add_text(props, "css", obs_module_text("CSS"), SPT_TEXT_MULTILINE);
+	obs_property_t *p = obs_properties_add_text(props, "css", obs_module_text("CSS"), OBS_TEXT_MULTILINE);
 	obs_property_text_set_monospace(p, true);
 	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
 	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshNotificationActive"));
 
 	obs_property_t *controlLevel = obs_properties_add_list(props, "webpage_control_level",
 							       obs_module_text("WebpageControlLevel"),
-							       SPT_COMBO_TYPE_LIST, SPT_COMBO_FORMAT_INT);
+							       OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
 
 	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.None"),
 				  (int)ControlLevel::None);
@@ -227,7 +227,7 @@ static void missing_file_callback(void *src, const char *new_path, void *data)
 
 	if (bs) {
 		obs_source_t *source = bs->source;
-		SPTDataAutoRelease settings = obs_source_get_settings(source);
+		OBSDataAutoRelease settings = obs_source_get_settings(source);
 		obs_data_set_string(settings, "local_file", new_path);
 		obs_source_update(source, settings);
 	}
@@ -242,7 +242,7 @@ static obs_missing_files_t *notification_source_missingfiles(void *data)
 
 	if (bs) {
 		obs_source_t *source = bs->source;
-		SPTDataAutoRelease settings = obs_source_get_settings(source);
+      OBSDataAutoRelease settings = obs_source_get_settings(source);
 
 		bool enabled = obs_data_get_bool(settings, "is_local_file");
 		const char *path = obs_data_get_string(settings, "local_file");
@@ -250,7 +250,7 @@ static obs_missing_files_t *notification_source_missingfiles(void *data)
 		if (enabled && strcmp(path, "") != 0) {
 			if (!os_file_exists(path)) {
 				obs_missing_file_t *file = obs_missing_file_create(
-					path, missing_file_callback, SPT_MISSING_FILE_SOURCE, bs->source, NULL);
+					path, missing_file_callback, OBS_MISSING_FILE_SOURCE, bs->source, NULL);
 
 				obs_missing_files_add_file(files, file);
 			}
@@ -293,8 +293,8 @@ static void NotificationInit(void)
 	uint32_t obs_min = (obs_ver >> 16) & 0xFF;
 	uint32_t obs_pat = obs_ver & 0xFFFF;
 
-	/* This allows servers the ability to determine that browser panels and
-	 * browser sources are coming from SPT. */
+	/* This allows servers the ability to determine that notification panels and
+	 * notification sources are coming from SPT. */
 	std::stringstream prod_ver;
 	prod_ver << "Chrome/";
 	prod_ver << std::to_string(cef_version_info(4)) << "." << std::to_string(cef_version_info(5)) << "."
@@ -341,13 +341,13 @@ static void NotificationInit(void)
 	CefString(&settings.cache_path) = conf_path_abs;
 #if !defined(__APPLE__) || defined(ENABLE_NOTIFICATION_LEGACY)
 	char *abs_path = os_get_abs_path_ptr(path.c_str());
-	CefString(&settings.browser_subprocess_path) = abs_path;
+	CefString(&settings.notification_subprocess_path) = abs_path;
 	bfree(abs_path);
 #endif
 
 	bool tex_sharing_avail = false;
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 	if (hwaccel) {
 		obs_enter_graphics();
 		hwaccel = tex_sharing_avail = gs_shared_texture_available();
@@ -358,7 +358,7 @@ static void NotificationInit(void)
 #if defined(__APPLE__) || defined(_WIN32) || !defined(ENABLE_WAYLAND)
 	app = new NotificationApp(tex_sharing_avail);
 #else
-	app = new NotificationApp(tex_sharing_avail, obs_get_nix_platform() == SPT_NIX_PLATFORM_WAYLAND);
+	app = new NotificationApp(tex_sharing_avail, obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND);
 #endif
 
 #ifdef _WIN32
@@ -413,7 +413,7 @@ static void NotificationManagerThread(void)
 }
 #endif
 
-extern "C" EXPORT void obs_browser_initialize(void)
+extern "C" EXPORT void spt_notification_initialize(void)
 {
 	if (!os_atomic_set_bool(&manager_initialized, true)) {
 #ifdef ENABLE_NOTIFICATION_QT_LOOP
@@ -427,25 +427,25 @@ extern "C" EXPORT void obs_browser_initialize(void)
 void RegisterNotificationSource()
 {
 	struct obs_source_info info = {};
-	info.id = "browser_source";
-	info.type = SPT_SOURCE_TYPE_INPUT;
-	info.output_flags = SPT_SOURCE_VIDEO | SPT_SOURCE_AUDIO | SPT_SOURCE_CUSTOM_DRAW | SPT_SOURCE_INTERACTION |
-			    SPT_SOURCE_DO_NOT_DUPLICATE | SPT_SOURCE_SRGB;
-	info.get_properties = browser_source_get_properties;
-	info.get_defaults = browser_source_get_defaults;
+	info.id = "notification_source";
+	info.type = OBS_SOURCE_TYPE_INPUT;
+	info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_AUDIO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_INTERACTION |
+			    OBS_SOURCE_DO_NOT_DUPLICATE | OBS_SOURCE_SRGB;
+	info.get_properties = notification_source_get_properties;
+	info.get_defaults = notification_source_get_defaults;
 	info.icon_type = SPT_ICON_TYPE_NOTIFICATION;
 
 	info.get_name = [](void *) {
 		return obs_module_text("NotificationSource");
 	};
 	info.create = [](obs_data_t *settings, obs_source_t *source) -> void * {
-		obs_browser_initialize();
+		spt_notification_initialize();
 		return new NotificationSource(settings, source);
 	};
 	info.destroy = [](void *data) {
 		static_cast<NotificationSource *>(data)->Destroy();
 	};
-	info.missing_files = browser_source_missingfiles;
+	info.missing_files = notification_source_missingfiles;
 	info.update = [](void *data, obs_data_t *settings) {
 		static_cast<NotificationSource *>(data)->Update(settings);
 	};
@@ -507,64 +507,64 @@ void RegisterNotificationSource()
 
 /* ========================================================================= */
 
-extern void DispatchJSEvent(std::string eventName, std::string jsonString, NotificationSource *browser = nullptr);
+extern void DispatchJSEvent(std::string eventName, std::string jsonString, NotificationSource *notification = nullptr);
 
 static void handle_obs_frontend_event(enum obs_frontend_event event, void *)
 {
 	switch (event) {
-	case SPT_FRONTEND_EVENT_STREAMING_STARTING:
+	case OBS_FRONTEND_EVENT_STREAMING_STARTING:
 		DispatchJSEvent("obsStreamingStarting", "null");
 		break;
-	case SPT_FRONTEND_EVENT_STREAMING_STARTED:
+	case OBS_FRONTEND_EVENT_STREAMING_STARTED:
 		DispatchJSEvent("obsStreamingStarted", "null");
 		break;
-	case SPT_FRONTEND_EVENT_STREAMING_STOPPING:
+	case OBS_FRONTEND_EVENT_STREAMING_STOPPING:
 		DispatchJSEvent("obsStreamingStopping", "null");
 		break;
-	case SPT_FRONTEND_EVENT_STREAMING_STOPPED:
+	case OBS_FRONTEND_EVENT_STREAMING_STOPPED:
 		DispatchJSEvent("obsStreamingStopped", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_STARTING:
+	case OBS_FRONTEND_EVENT_RECORDING_STARTING:
 		DispatchJSEvent("obsRecordingStarting", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_STARTED:
+	case OBS_FRONTEND_EVENT_RECORDING_STARTED:
 		DispatchJSEvent("obsRecordingStarted", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_PAUSED:
+	case OBS_FRONTEND_EVENT_RECORDING_PAUSED:
 		DispatchJSEvent("obsRecordingPaused", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_UNPAUSED:
+	case OBS_FRONTEND_EVENT_RECORDING_UNPAUSED:
 		DispatchJSEvent("obsRecordingUnpaused", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_STOPPING:
+	case OBS_FRONTEND_EVENT_RECORDING_STOPPING:
 		DispatchJSEvent("obsRecordingStopping", "null");
 		break;
-	case SPT_FRONTEND_EVENT_RECORDING_STOPPED:
+	case OBS_FRONTEND_EVENT_RECORDING_STOPPED:
 		DispatchJSEvent("obsRecordingStopped", "null");
 		break;
-	case SPT_FRONTEND_EVENT_REPLAY_BUFFER_STARTING:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING:
 		DispatchJSEvent("obsReplaybufferStarting", "null");
 		break;
-	case SPT_FRONTEND_EVENT_REPLAY_BUFFER_STARTED:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED:
 		DispatchJSEvent("obsReplaybufferStarted", "null");
 		break;
-	case SPT_FRONTEND_EVENT_REPLAY_BUFFER_SAVED:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED:
 		DispatchJSEvent("obsReplaybufferSaved", "null");
 		break;
-	case SPT_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING:
 		DispatchJSEvent("obsReplaybufferStopping", "null");
 		break;
-	case SPT_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED:
+	case OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED:
 		DispatchJSEvent("obsReplaybufferStopped", "null");
 		break;
-	case SPT_FRONTEND_EVENT_VIRTUALCAM_STARTED:
+	case OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED:
 		DispatchJSEvent("obsVirtualcamStarted", "null");
 		break;
-	case SPT_FRONTEND_EVENT_VIRTUALCAM_STOPPED:
+	case OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED:
 		DispatchJSEvent("obsVirtualcamStopped", "null");
 		break;
-	case SPT_FRONTEND_EVENT_SCENE_CHANGED: {
-		SPTSourceAutoRelease source = obs_frontend_get_current_scene();
+	case OBS_FRONTEND_EVENT_SCENE_CHANGED: {
+		OBSSourceAutoRelease source = obs_frontend_get_current_scene();
 
 		if (!source)
 			break;
@@ -580,7 +580,7 @@ static void handle_obs_frontend_event(enum obs_frontend_event event, void *)
 		DispatchJSEvent("obsSceneChanged", json.dump());
 		break;
 	}
-	case SPT_FRONTEND_EVENT_SCENE_LIST_CHANGED: {
+	case OBS_FRONTEND_EVENT_SCENE_LIST_CHANGED: {
 		struct obs_frontend_source_list list = {};
 		obs_frontend_get_scenes(&list);
 		std::vector<const char *> scenes_vector;
@@ -594,8 +594,8 @@ static void handle_obs_frontend_event(enum obs_frontend_event event, void *)
 		DispatchJSEvent("obsSceneListChanged", json.dump());
 		break;
 	}
-	case SPT_FRONTEND_EVENT_TRANSITION_CHANGED: {
-		SPTSourceAutoRelease source = obs_frontend_get_current_transition();
+	case OBS_FRONTEND_EVENT_TRANSITION_CHANGED: {
+      OBSSourceAutoRelease source = obs_frontend_get_current_transition();
 
 		if (!source)
 			break;
@@ -609,7 +609,7 @@ static void handle_obs_frontend_event(enum obs_frontend_event event, void *)
 		DispatchJSEvent("obsTransitionChanged", json.dump());
 		break;
 	}
-	case SPT_FRONTEND_EVENT_TRANSITION_LIST_CHANGED: {
+	case OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED: {
 		struct obs_frontend_source_list list = {};
 		obs_frontend_get_transitions(&list);
 		std::vector<const char *> transitions_vector;
@@ -623,7 +623,7 @@ static void handle_obs_frontend_event(enum obs_frontend_event event, void *)
 		DispatchJSEvent("obsTransitionListChanged", json.dump());
 		break;
 	}
-	case SPT_FRONTEND_EVENT_EXIT:
+	case OBS_FRONTEND_EVENT_EXIT:
 		DispatchJSEvent("obsExit", "null");
 		break;
 	default:;
@@ -661,7 +661,7 @@ static inline void EnumAdapterCount()
 }
 #endif
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 #ifdef _WIN32
 static const wchar_t *blacklisted_devices[] = {L"Intel", L"Microsoft", L"Radeon HD 8850M", L"Radeon HD 7660", nullptr};
 
@@ -683,7 +683,7 @@ static void check_hwaccel_support(void)
 				blog(LOG_INFO, "[spt-notification]: "
 					       "Blacklisted device "
 					       "detected, "
-					       "disabling browser "
+					       "disabling notification "
 					       "source hardware "
 					       "acceleration.");
 				break;
@@ -723,25 +723,25 @@ bool obs_module_load(void)
 		return false;
 #endif
 #endif
-	blog(LOG_INFO, "[spt-notification]: Version %s", SPT_NOTIFICATION_VERSION_STRING);
+	blog(LOG_INFO, "[spt-notification]: Version %s", OBS_NOTIFICATION_VERSION_STRING);
 	blog(LOG_INFO, "[spt-notification]: CEF Version %i.%i.%i.%i (runtime), %s (compiled)", cef_version_info(4),
 	     cef_version_info(5), cef_version_info(6), cef_version_info(7), CEF_VERSION);
 
 	RegisterNotificationSource();
 	obs_frontend_add_event_callback(handle_obs_frontend_event, nullptr);
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
-	SPTDataAutoRelease private_data = obs_get_private_data();
-	hwaccel = obs_data_get_bool(private_data, "NotificationHWAccel");
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
+   OBSDataAutoRelease private_data = obs_get_private_data();
+   hwaccel = obs_data_get_bool(private_data, "BrowserHWAccel");
 
-	if (hwaccel) {
-		check_hwaccel_support();
-	}
+   if (hwaccel) {
+      check_hwaccel_support();
+   }
 #endif
 
 #if defined(__APPLE__) && CHROME_VERSION_BUILD < 4183
 	// Make sure CEF malloc hijacking happens early in the process
-	obs_browser_initialize();
+	spt_notification_initialize();
 #endif
 
 	return true;
@@ -758,7 +758,7 @@ void obs_module_post_load(void)
 		if (!event_name)
 			return;
 
-		SPTDataAutoRelease event_data = obs_data_get_obj(request_data, "event_data");
+      OBSDataAutoRelease event_data = obs_data_get_obj(request_data, "event_data");
 		const char *event_data_string = event_data ? obs_data_get_json(event_data) : "{}";
 
 		DispatchJSEvent(event_name, event_data_string, nullptr);

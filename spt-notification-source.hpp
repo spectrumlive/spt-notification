@@ -61,7 +61,7 @@ struct NotificationSource {
 	bool tex_sharing_avail = false;
 	bool create_notification = false;
 	std::recursive_mutex lockNotification;
-	CefRefPtr<CefNotification> cefNotification;
+	CefRefPtr<CefBrowser> cefNotification;
 
 	std::string url;
 	std::string css;
@@ -71,7 +71,7 @@ struct NotificationSource {
 	uint32_t last_cy = 0;
 	gs_color_format last_format = GS_UNKNOWN;
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 #ifdef _WIN32
 	void *last_handle = INVALID_HANDLE_VALUE;
 #elif defined(__APPLE__)
@@ -91,7 +91,7 @@ struct NotificationSource {
 	bool reroute_audio = true;
 	std::atomic<bool> destroying = false;
 	ControlLevel webpage_control_level = DEFAULT_CONTROL_LEVEL;
-#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_NOTIFICATION_SHARED_TEXTURE)
+#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_BROWSER_SHARED_TEXTURE)
 	bool reset_frame = false;
 #endif
 	bool is_showing = false;
@@ -146,10 +146,10 @@ struct NotificationSource {
 	void SetActive(bool active);
 	void Refresh();
 
-#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_NOTIFICATION_SHARED_TEXTURE)
+#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_BROWSER_SHARED_TEXTURE)
 	inline void SignalBeginFrame();
 #endif
 
-	void SetNotification(CefRefPtr<CefNotification> b);
-	CefRefPtr<CefNotification> GetNotification();
+	void SetNotification(CefRefPtr<CefBrowser> b);
+	CefRefPtr<CefBrowser> GetNotification();
 };

@@ -43,7 +43,7 @@ CefRefPtr<CefRenderProcessHandler> NotificationApp::GetRenderProcessHandler()
 	return this;
 }
 
-CefRefPtr<CefNotificationProcessHandler> NotificationApp::GetNotificationProcessHandler()
+CefRefPtr<CefBrowserProcessHandler> NotificationApp::GetBrowserProcessHandler()
 {
 	return this;
 }
@@ -107,14 +107,14 @@ std::vector<std::string> exposedFunctions = {"getControlLevel",     "getCurrentS
 					     "setCurrentScene",     "getTransitions",   "getCurrentTransition",
 					     "setCurrentTransition"};
 
-void NotificationApp::OnContextCreated(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame>, CefRefPtr<CefV8Context> context)
+void NotificationApp::OnContextCreated(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame>, CefRefPtr<CefV8Context> context)
 {
 	CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
 
 	CefRefPtr<CefV8Value> obsStudioObj = CefV8Value::CreateObject(nullptr, nullptr);
 	globalObj->SetValue("obsstudio", obsStudioObj, V8_PROPERTY_ATTRIBUTE_NONE);
 
-	CefRefPtr<CefV8Value> pluginVersion = CefV8Value::CreateString(SPT_NOTIFICATION_VERSION_STRING);
+	CefRefPtr<CefV8Value> pluginVersion = CefV8Value::CreateString(OBS_NOTIFICATION_VERSION_STRING);
 	obsStudioObj->SetValue("pluginVersion", pluginVersion, V8_PROPERTY_ATTRIBUTE_NONE);
 
 	for (std::string name : exposedFunctions) {
@@ -132,7 +132,7 @@ void NotificationApp::OnContextCreated(CefRefPtr<CefNotification> notification, 
 #endif
 }
 
-void NotificationApp::ExecuteJSFunction(CefRefPtr<CefNotification> notification, const char *functionName, CefV8ValueList arguments)
+void NotificationApp::ExecuteJSFunction(CefRefPtr<CefBrowser> notification, const char *functionName, CefV8ValueList arguments)
 {
 	std::vector<CefString> names;
 	notification->GetFrameNames(names);
@@ -159,7 +159,7 @@ void NotificationApp::ExecuteJSFunction(CefRefPtr<CefNotification> notification,
 }
 
 #if !ENABLE_WASHIDDEN
-void NotificationApp::SetFrameDocumentVisibility(CefRefPtr<CefNotification> notification, CefRefPtr<CefFrame> frame, bool isVisible)
+void NotificationApp::SetFrameDocumentVisibility(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame, bool isVisible)
 {
 	UNUSED_PARAMETER(notification);
 
@@ -201,7 +201,7 @@ void NotificationApp::SetFrameDocumentVisibility(CefRefPtr<CefNotification> noti
 	context->Exit();
 }
 
-void NotificationApp::SetDocumentVisibility(CefRefPtr<CefNotification> notification, bool isVisible)
+void NotificationApp::SetDocumentVisibility(CefRefPtr<CefBrowser> notification, bool isVisible)
 {
 	/* This method might be called before OnContextCreated
 	 * call is made. We'll save the requested visibility
@@ -210,7 +210,7 @@ void NotificationApp::SetDocumentVisibility(CefRefPtr<CefNotification> notificat
 	notificationVis[notification->GetIdentifier()] = isVisible;
 
 	std::vector<int64> frameIdentifiers;
-	/* Set visibility state for every frame in the browser
+	/* Set visibility state for every frame in the notification
 	 *
 	 * According to the Page Visibility API documentation:
 	 * https://developer.mozilla.org/en-US/docs/Web/API/Page_Visibility_API
@@ -221,14 +221,14 @@ void NotificationApp::SetDocumentVisibility(CefRefPtr<CefNotification> notificat
 	 * visibility events or change the state of the document
 	 * contained within the frame."
 	 *
-	 * Thus, we set the same visibility state for every frame of the browser.
+	 * Thus, we set the same visibility state for every frame of the notification.
 	 */
-	browser->GetFrameIdentifiers(frameIdentifiers);
+	notification->GetFrameIdentifiers(frameIdentifiers);
 
 	for (int64 frameId : frameIdentifiers) {
-		CefRefPtr<CefFrame> frame = browser->GetFrame(frameId);
+		CefRefPtr<CefFrame> frame = notification->GetFrame(frameId);
 
-		SetFrameDocumentVisibility(browser, frame, isVisible);
+		SetFrameDocumentVisibility(notification, frame, isVisible);
 	}
 }
 #endif
@@ -280,11 +280,11 @@ CefRefPtr<CefV8Value> CefValueToCefV8Value(CefRefPtr<CefValue> value)
 	return result;
 }
 
-bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefNotification> browser, CefRefPtr<CefFrame> frame,
+bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefBrowser> notification, CefRefPtr<CefFrame> frame,
 					  CefProcessId source_process, CefRefPtr<CefProcessMessage> message)
 {
 	UNUSED_PARAMETER(frame);
-	DCHECK(source_process == PID_NOTIFICATION);
+	DCHECK(source_process == PID_BROWSER);
 
 	CefRefPtr<CefListValue> args = message->GetArgumentList();
 
@@ -292,17 +292,17 @@ bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefNotification> browse
 		CefV8ValueList arguments;
 		arguments.push_back(CefV8Value::CreateBool(args->GetBool(0)));
 
-		ExecuteJSFunction(browser, "onVisibilityChange", arguments);
+		ExecuteJSFunction(notification, "onVisibilityChange", arguments);
 
 #if !ENABLE_WASHIDDEN
-		SetDocumentVisibility(browser, args->GetBool(0));
+		SetDocumentVisibility(notification, args->GetBool(0));
 #endif
 
 	} else if (message->GetName() == "Active") {
 		CefV8ValueList arguments;
 		arguments.push_back(CefV8Value::CreateBool(args->GetBool(0)));
 
-		ExecuteJSFunction(browser, "onActiveChange", arguments);
+		ExecuteJSFunction(notification, "onActiveChange", arguments);
 
 	} else if (message->GetName() == "DispatchJSEvent") {
 		nlohmann::json payloadJson = nlohmann::json::parse(args->GetString(1).ToString(), nullptr, false);
@@ -320,13 +320,13 @@ bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefNotification> browse
 		script += ");";
 
 		std::vector<CefString> names;
-		browser->GetFrameNames(names);
+		notification->GetFrameNames(names);
 		for (auto &name : names) {
 			CefRefPtr<CefFrame> frame =
 #if CHROME_VERSION_BUILD >= 6261
-				browser->GetFrameByName(name);
+				notification->GetFrameByName(name);
 #else
-				browser->GetFrame(name);
+				notification->GetFrame(name);
 #endif
 			CefRefPtr<CefV8Context> context = frame->GetV8Context();
 
@@ -339,7 +339,7 @@ bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefNotification> browse
 
 			/* Create the CustomEvent object
 			* We have to use eval to invoke the new operator */
-			context->Eval(script, browser->GetMainFrame()->GetURL(), 0, returnValue, exception);
+			context->Eval(script, notification->GetMainFrame()->GetURL(), 0, returnValue, exception);
 
 			CefV8ValueList arguments;
 			arguments.push_back(returnValue);
@@ -351,7 +351,7 @@ bool NotificationApp::OnProcessMessageReceived(CefRefPtr<CefNotification> browse
 		}
 
 	} else if (message->GetName() == "executeCallback") {
-		CefRefPtr<CefV8Context> context = browser->GetMainFrame()->GetV8Context();
+		CefRefPtr<CefV8Context> context = notification->GetMainFrame()->GetV8Context();
 
 		context->Enter();
 
@@ -420,8 +420,8 @@ bool NotificationApp::Execute(const CefString &name, CefRefPtr<CefV8Value>, cons
 				args->SetDouble(pos, arguments[l]->GetDoubleValue());
 		}
 
-		CefRefPtr<CefNotification> browser = CefV8Context::GetCurrentContext()->GetNotification();
-		SendNotificationProcessMessage(browser, PID_NOTIFICATION, msg);
+      CefRefPtr<CefBrowser> notification = CefV8Context::GetCurrentContext()->GetBrowser();
+		SendNotificationProcessMessage(notification, PID_BROWSER, msg);
 
 	} else {
 		/* Function does not exist. */
@@ -435,10 +435,10 @@ bool NotificationApp::Execute(const CefString &name, CefRefPtr<CefV8Value>, cons
 Q_DECLARE_METATYPE(MessageTask);
 MessageObject messageObject;
 
-void QueueNotificationTask(CefRefPtr<CefNotification> browser, NotificationFunc func)
+void QueueNotificationTask(CefRefPtr<CefBrowser> notification, NotificationFunc func)
 {
-	std::lock_guard<std::mutex> lock(messageObject.browserTaskMutex);
-	messageObject.browserTasks.emplace_back(browser, func);
+	std::lock_guard<std::mutex> lock(messageObject.notificationTaskMutex);
+	messageObject.notificationTasks.emplace_back(notification, func);
 
 	QMetaObject::invokeMethod(&messageObject, "ExecuteNextNotificationTask", Qt::QueuedConnection);
 }
@@ -447,15 +447,15 @@ bool MessageObject::ExecuteNextNotificationTask()
 {
 	Task nextTask;
 	{
-		std::lock_guard<std::mutex> lock(browserTaskMutex);
-		if (!browserTasks.size())
+		std::lock_guard<std::mutex> lock(notificationTaskMutex);
+		if (!notificationTasks.size())
 			return false;
 
-		nextTask = browserTasks[0];
-		browserTasks.pop_front();
+		nextTask = notificationTasks[0];
+		notificationTasks.pop_front();
 	}
 
-	nextTask.func(nextTask.browser);
+	nextTask.func(nextTask.notification);
 	return true;
 }
 

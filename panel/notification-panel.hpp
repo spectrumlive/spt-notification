@@ -55,9 +55,9 @@ signals:
 struct QCef {
 	virtual ~QCef() {}
 
-	virtual bool init_browser(void) = 0;
+	virtual bool init_notification(void) = 0;
 	virtual bool initialized(void) = 0;
-	virtual bool wait_for_browser_init(void) = 0;
+	virtual bool wait_for_notification_init(void) = 0;
 
 	virtual QCefWidget *create_widget(QWidget *parent, const std::string &url,
 					  QCefCookieManager *cookie_manager = nullptr) = 0;
@@ -71,33 +71,33 @@ struct QCef {
 	virtual void add_force_popup_url(const std::string &url, QObject *obj) = 0;
 };
 
-static inline void *get_browser_lib()
+static inline void *get_notification_lib()
 {
 	// Disable panels on Wayland for now
 	bool isWayland = false;
 #ifdef ENABLE_WAYLAND
-	isWayland = obs_get_nix_platform() == SPT_NIX_PLATFORM_WAYLAND;
+	isWayland = obs_get_nix_platform() == OBS_NIX_PLATFORM_WAYLAND;
 #endif
 	if (isWayland)
 		return nullptr;
 
-	obs_module_t *browserModule = obs_get_module("spt-notification");
+	obs_module_t *notificationModule = obs_get_module("spt-notification");
 
-	if (!browserModule)
+	if (!notificationModule)
 		return nullptr;
 
-	return obs_get_module_lib(browserModule);
+	return obs_get_module_lib(notificationModule);
 }
 
-static inline QCef *obs_browser_init_panel(void)
+static inline QCef *spt_notification_init_panel(void)
 {
-	void *lib = get_browser_lib();
+	void *lib = get_notification_lib();
 	QCef *(*create_qcef)(void) = nullptr;
 
 	if (!lib)
 		return nullptr;
 
-	create_qcef = (decltype(create_qcef))os_dlsym(lib, "obs_browser_create_qcef");
+	create_qcef = (decltype(create_qcef))os_dlsym(lib, "spt_notification_create_qcef");
 
 	if (!create_qcef)
 		return nullptr;
@@ -105,15 +105,15 @@ static inline QCef *obs_browser_init_panel(void)
 	return create_qcef();
 }
 
-static inline int obs_browser_qcef_version(void)
+static inline int spt_notification_qcef_version(void)
 {
-	void *lib = get_browser_lib();
+	void *lib = get_notification_lib();
 	int (*qcef_version)(void) = nullptr;
 
 	if (!lib)
 		return 0;
 
-	qcef_version = (decltype(qcef_version))os_dlsym(lib, "obs_browser_qcef_version_export");
+	qcef_version = (decltype(qcef_version))os_dlsym(lib, "spt_notification_qcef_version_export");
 
 	if (!qcef_version)
 		return 0;

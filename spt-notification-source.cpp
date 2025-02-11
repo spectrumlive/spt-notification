@@ -44,7 +44,7 @@ extern bool QueueCEFTask(std::function<void()> task);
 static mutex notification_list_mutex;
 static NotificationSource *first_notification = nullptr;
 
-static void SendNotificationVisibility(CefRefPtr<CefNotification> notification, bool isVisible)
+static void SendNotificationVisibility(CefRefPtr<CefBrowser> notification, bool isVisible)
 {
 	if (!notification)
 		return;
@@ -106,7 +106,7 @@ NotificationSource::NotificationSource(obs_data_t *, obs_source_t *source_) : so
 	first_notification = this;
 }
 
-static void ActuallyCloseNotification(CefRefPtr<CefNotification> cefNotification)
+static void ActuallyCloseNotification(CefRefPtr<CefBrowser> cefNotification)
 {
 	CefRefPtr<CefClient> client = cefNotification->GetHost()->GetClient();
 	NotificationClient *bc = reinterpret_cast<NotificationClient *>(client.get());
@@ -120,7 +120,7 @@ static void ActuallyCloseNotification(CefRefPtr<CefNotification> cefNotification
          * https://bitbucket.org/chromiumembedded/cef/issues/1363/washidden-api-got-broken-on-branch-2062)
          */
 	cefNotification->GetHost()->WasHidden(true);
-	cefNotification->GetHost()->CloseNotification(true);
+	cefNotification->GetHost()->CloseBrowser(true);
 }
 
 NotificationSource::~NotificationSource()
@@ -164,12 +164,12 @@ void NotificationSource::ExecuteOnNotification(NotificationFunc func, bool async
 		}
 		os_event_destroy(finishedEvent);
 	} else {
-		CefRefPtr<CefNotification> notification = GetNotification();
-		if (!!browser) {
+		CefRefPtr<CefBrowser> notification = GetNotification();
+		if (!!notification) {
 #ifdef ENABLE_NOTIFICATION_QT_LOOP
 			QueueNotificationTask(cefNotification, func);
 #else
-			QueueCEFTask([=]() { func(browser); });
+			QueueCEFTask([=]() { func(notification); });
 #endif
 		}
 	}
@@ -178,7 +178,7 @@ void NotificationSource::ExecuteOnNotification(NotificationFunc func, bool async
 bool NotificationSource::CreateNotification()
 {
 	return QueueCEFTask([this]() {
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 		if (hwaccel) {
 			obs_enter_graphics();
 			tex_sharing_avail = gs_shared_texture_available();
@@ -188,7 +188,7 @@ bool NotificationSource::CreateNotification()
 		bool hwaccel = false;
 #endif
 
-		CefRefPtr<NotificationClient> browserClient =
+		CefRefPtr<NotificationClient> notificationClient =
 			new NotificationClient(this, hwaccel && tex_sharing_avail, reroute_audio, webpage_control_level);
 
 		CefWindowInfo windowInfo;
@@ -201,13 +201,13 @@ bool NotificationSource::CreateNotification()
 #endif
 		windowInfo.windowless_rendering_enabled = true;
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 		windowInfo.shared_texture_enabled = hwaccel;
 #endif
 
-		CefNotificationSettings cefNotificationSettings;
+		CefBrowserSettings cefNotificationSettings;
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 #ifdef NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED
 		if (!fps_custom) {
 			windowInfo.external_begin_frame_enabled = true;
@@ -235,10 +235,10 @@ bool NotificationSource::CreateNotification()
 			cefNotificationSettings.web_security = STATE_DISABLED;
 		}
 #endif
-		auto browser = CefNotificationHost::CreateNotificationSync(windowInfo, browserClient, url, cefNotificationSettings,
+		auto notification = CefBrowserHost::CreateBrowserSync(windowInfo, notificationClient, url, cefNotificationSettings,
 								 CefRefPtr<CefDictionaryValue>(), nullptr);
 
-		SetNotification(browser);
+		SetNotification(notification);
 
 		if (reroute_audio)
 			cefNotification->GetHost()->SetAudioMuted(true);
@@ -272,12 +272,12 @@ void NotificationSource::SendMouseClick(const struct obs_mouse_event *event, int
 	int32_t y = event->y;
 
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 			CefMouseEvent e;
 			e.modifiers = modifiers;
 			e.x = x;
 			e.y = y;
-			CefNotificationHost::MouseButtonType buttonType = (CefNotificationHost::MouseButtonType)type;
+			CefBrowserHost::MouseButtonType buttonType = (CefBrowserHost::MouseButtonType)type;
 			cefNotification->GetHost()->SendMouseClickEvent(e, buttonType, mouse_up, click_count);
 		},
 		true);
@@ -290,7 +290,7 @@ void NotificationSource::SendMouseMove(const struct obs_mouse_event *event, bool
 	int32_t y = event->y;
 
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 			CefMouseEvent e;
 			e.modifiers = modifiers;
 			e.x = x;
@@ -307,7 +307,7 @@ void NotificationSource::SendMouseWheel(const struct obs_mouse_event *event, int
 	int32_t y = event->y;
 
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 			CefMouseEvent e;
 			e.modifiers = modifiers;
 			e.x = x;
@@ -320,7 +320,7 @@ void NotificationSource::SendMouseWheel(const struct obs_mouse_event *event, int
 void NotificationSource::SendFocus(bool focus)
 {
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 #if CHROME_VERSION_BUILD < 4430
 			cefNotification->GetHost()->SendFocusEvent(focus);
 #else
@@ -349,7 +349,7 @@ void NotificationSource::SendKeyClick(const struct obs_key_event *event, bool ke
 #endif
 
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 			CefKeyEvent e;
 			e.windows_key_code = native_vkey;
 #ifdef __APPLE__
@@ -398,7 +398,7 @@ void NotificationSource::SetShowing(bool showing)
 		}
 	} else {
 		ExecuteOnNotification(
-			[=](CefRefPtr<CefNotification> cefNotification) {
+			[=](CefRefPtr<CefBrowser> cefNotification) {
 				CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("Visibility");
 				CefRefPtr<CefListValue> args = msg->GetArgumentList();
 				args->SetBool(0, showing);
@@ -408,7 +408,7 @@ void NotificationSource::SetShowing(bool showing)
 		nlohmann::json json;
 		json["visible"] = showing;
 		DispatchJSEvent("obsSourceVisibleChanged", json.dump(), this);
-#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_NOTIFICATION_SHARED_TEXTURE)
+#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_BROWSER_SHARED_TEXTURE)
 		if (showing && !fps_custom) {
 			reset_frame = false;
 		}
@@ -432,7 +432,7 @@ void NotificationSource::SetShowing(bool showing)
 void NotificationSource::SetActive(bool active)
 {
 	ExecuteOnNotification(
-		[=](CefRefPtr<CefNotification> cefNotification) {
+		[=](CefRefPtr<CefBrowser> cefNotification) {
 			CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("Active");
 			CefRefPtr<CefListValue> args = msg->GetArgumentList();
 			args->SetBool(0, active);
@@ -446,28 +446,28 @@ void NotificationSource::SetActive(bool active)
 
 void NotificationSource::Refresh()
 {
-	ExecuteOnNotification([](CefRefPtr<CefNotification> cefNotification) { cefNotification->ReloadIgnoreCache(); }, true);
+	ExecuteOnNotification([](CefRefPtr<CefBrowser> cefNotification) { cefNotification->ReloadIgnoreCache(); }, true);
 }
 
-void NotificationSource::SetNotification(CefRefPtr<CefNotification> b)
+void NotificationSource::SetNotification(CefRefPtr<CefBrowser> b)
 {
 	std::lock_guard<std::recursive_mutex> auto_lock(lockNotification);
 	cefNotification = b;
 }
 
-CefRefPtr<CefNotification> NotificationSource::GetNotification()
+CefRefPtr<CefBrowser> NotificationSource::GetNotification()
 {
 	std::lock_guard<std::recursive_mutex> auto_lock(lockNotification);
 	return cefNotification;
 }
 
-#ifdef ENABLE_NOTIFICATION_SHARED_TEXTURE
+#ifdef ENABLE_BROWSER_SHARED_TEXTURE
 #ifdef NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED
 inline void NotificationSource::SignalBeginFrame()
 {
 	if (reset_frame) {
 		ExecuteOnNotification(
-			[](CefRefPtr<CefNotification> cefNotification) { cefNotification->GetHost()->SendExternalBeginFrame(); },
+			[](CefRefPtr<CefBrowser> cefNotification) { cefNotification->GetHost()->SendExternalBeginFrame(); },
 			true);
 
 		reset_frame = false;
@@ -554,7 +554,7 @@ void NotificationSource::Update(obs_data_t *settings)
 			width = n_width;
 			height = n_height;
 			ExecuteOnNotification(
-				[=](CefRefPtr<CefNotification> cefNotification) {
+				[=](CefRefPtr<CefBrowser> cefNotification) {
 					const CefSize cefSize(width, height);
 					cefNotification->GetHost()->GetClient()->GetDisplayHandler()->OnAutoResize(
 						cefNotification, cefSize);
@@ -586,16 +586,16 @@ void NotificationSource::Update(obs_data_t *settings)
 	ClearAudioStreams();
 #endif
 	if (!shutdown_on_invisible || obs_source_showing(source))
-		create_browser = true;
+		create_notification = true;
 
 	first_update = false;
 }
 
 void NotificationSource::Tick()
 {
-	if (create_browser && CreateNotification())
-		create_browser = false;
-#if defined(ENABLE_NOTIFICATION_SHARED_TEXTURE)
+	if (create_notification && CreateNotification())
+		create_notification = false;
+#if defined(ENABLE_BROWSER_SHARED_TEXTURE)
 #if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED)
 	if (!fps_custom)
 		reset_frame = true;
@@ -619,15 +619,15 @@ extern void ProcessCef();
 void NotificationSource::Render()
 {
 	bool flip = false;
-#if defined(ENABLE_NOTIFICATION_SHARED_TEXTURE) && CHROME_VERSION_BUILD < 6367
+#if defined(ENABLE_BROWSER_SHARED_TEXTURE) && CHROME_VERSION_BUILD < 6367
 	flip = hwaccel;
 #endif
 
 	if (texture) {
 #ifdef __APPLE__
-		gs_effect_t *effect = obs_get_base_effect((hwaccel) ? SPT_EFFECT_DEFAULT_RECT : SPT_EFFECT_DEFAULT);
+		gs_effect_t *effect = obs_get_base_effect((hwaccel) ? OBS_EFFECT_DEFAULT_RECT : OBS_EFFECT_DEFAULT);
 #else
-		gs_effect_t *effect = obs_get_base_effect(SPT_EFFECT_DEFAULT);
+		gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
 #endif
 
 		bool linear_sample = extra_texture == NULL;
@@ -665,7 +665,7 @@ void NotificationSource::Render()
 		gs_enable_framebuffer_srgb(previous);
 	}
 
-#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_NOTIFICATION_SHARED_TEXTURE)
+#if defined(NOTIFICATION_EXTERNAL_BEGIN_FRAME_ENABLED) && defined(ENABLE_BROWSER_SHARED_TEXTURE)
 	SignalBeginFrame();
 #elif defined(ENABLE_NOTIFICATION_QT_LOOP)
 	ProcessCef();
@@ -674,7 +674,7 @@ void NotificationSource::Render()
 
 static void ExecuteOnNotification(NotificationFunc func, NotificationSource *bs)
 {
-	lock_guard<mutex> lock(browser_list_mutex);
+	lock_guard<mutex> lock(notification_list_mutex);
 
 	if (bs) {
 		NotificationSource *bsw = reinterpret_cast<NotificationSource *>(bs);
@@ -684,9 +684,9 @@ static void ExecuteOnNotification(NotificationFunc func, NotificationSource *bs)
 
 static void ExecuteOnAllNotifications(NotificationFunc func)
 {
-	lock_guard<mutex> lock(browser_list_mutex);
+	lock_guard<mutex> lock(notification_list_mutex);
 
-	NotificationSource *bs = first_browser;
+	NotificationSource *bs = first_notification;
 	while (bs) {
 		NotificationSource *bsw = reinterpret_cast<NotificationSource *>(bs);
 		bsw->ExecuteOnNotification(func, true);
@@ -694,9 +694,9 @@ static void ExecuteOnAllNotifications(NotificationFunc func)
 	}
 }
 
-void DispatchJSEvent(std::string eventName, std::string jsonString, NotificationSource *browser)
+void DispatchJSEvent(std::string eventName, std::string jsonString, NotificationSource *notification)
 {
-	const auto jsEvent = [=](CefRefPtr<CefNotification> cefNotification) {
+	const auto jsEvent = [=](CefRefPtr<CefBrowser> cefNotification) {
 		CefRefPtr<CefProcessMessage> msg = CefProcessMessage::Create("DispatchJSEvent");
 		CefRefPtr<CefListValue> args = msg->GetArgumentList();
 
@@ -705,8 +705,8 @@ void DispatchJSEvent(std::string eventName, std::string jsonString, Notification
 		SendNotificationProcessMessage(cefNotification, PID_RENDERER, msg);
 	};
 
-	if (!browser)
+	if (!notification)
 		ExecuteOnAllNotifications(jsEvent);
 	else
-		ExecuteOnNotification(jsEvent, browser);
+		ExecuteOnNotification(jsEvent, notification);
 }
