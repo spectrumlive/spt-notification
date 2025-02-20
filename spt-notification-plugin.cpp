@@ -118,7 +118,10 @@ overflow: hidden; \
 
 static void notification_source_get_defaults(obs_data_t *settings)
 {
-	obs_data_set_default_string(settings, "url", "https://obsproject.com/notification-source");
+   struct dstr url_with_slug;
+   dstr_init_copy(&url_with_slug, "https://beta.spectrumlive.xyz/live/");
+   dstr_cat(&url_with_slug, obs_data_get_string(settings, "live_slug"));
+   obs_data_set_default_string(settings, "url", url_with_slug.array);
 	obs_data_set_default_int(settings, "width", 800);
 	obs_data_set_default_int(settings, "height", 600);
 	obs_data_set_default_int(settings, "fps", 30);
@@ -156,27 +159,8 @@ static bool is_fps_custom(obs_properties_t *props, obs_property_t *, obs_data_t 
 
 static obs_properties_t *notification_source_get_properties(void *data)
 {
+   UNUSED_PARAMETER(data);
 	obs_properties_t *props = obs_properties_create();
-	NotificationSource *bs = static_cast<NotificationSource *>(data);
-	DStr path;
-
-	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
-	obs_property_t *prop = obs_properties_add_bool(props, "is_local_file", obs_module_text("LocalFile"));
-
-	if (bs && !bs->url.empty()) {
-		const char *slash;
-
-		dstr_copy(path, bs->url.c_str());
-		dstr_replace(path, "\\", "/");
-		slash = strrchr(path->array, '/');
-		if (slash)
-			dstr_resize(path, slash - path->array + 1);
-	}
-
-	obs_property_set_modified_callback(prop, is_local_file_modified);
-	obs_properties_add_path(props, "local_file", obs_module_text("LocalFile"), OBS_PATH_FILE, "*.*", path->array);
-	obs_properties_add_text(props, "url", obs_module_text("URL"), OBS_TEXT_DEFAULT);
-
 	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
 	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
 
@@ -188,30 +172,6 @@ static obs_properties_t *notification_source_get_properties(void *data)
 #ifndef ENABLE_BROWSER_SHARED_TEXTURE
 	obs_property_set_enabled(fps_set, false);
 #endif
-
-	obs_properties_add_int(props, "fps", obs_module_text("FPS"), 1, 60, 1);
-
-	obs_property_t *p = obs_properties_add_text(props, "css", obs_module_text("CSS"), OBS_TEXT_MULTILINE);
-	obs_property_text_set_monospace(p, true);
-	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
-	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshNotificationActive"));
-
-	obs_property_t *controlLevel = obs_properties_add_list(props, "webpage_control_level",
-							       obs_module_text("WebpageControlLevel"),
-							       OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_INT);
-
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.None"),
-				  (int)ControlLevel::None);
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.ReadObs"),
-				  (int)ControlLevel::ReadObs);
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.ReadUser"),
-				  (int)ControlLevel::ReadUser);
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.Basic"),
-				  (int)ControlLevel::Basic);
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.Advanced"),
-				  (int)ControlLevel::Advanced);
-	obs_property_list_add_int(controlLevel, obs_module_text("WebpageControlLevel.Level.All"),
-				  (int)ControlLevel::All);
 
 	obs_properties_add_button(props, "refreshnocache", obs_module_text("RefreshNoCache"),
 				  [](obs_properties_t *, obs_property_t *, void *data) {
