@@ -49,7 +49,7 @@ foreach(helper IN LISTS helper_suffixes)
     PROPERTIES MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_BINARY_DIR}/Info-Helper${helper_plist}.plist"
                OUTPUT_NAME "${target_output_name}"
                FOLDER plugins/spt-notification/Helpers
-               XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER com.obsproject.obs-studio.helper${helper_plist}
+               XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER xyz.spectrumlive.spectrum-studio.helper${helper_plist}
                XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS
                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/entitlements-helper${helper_plist}.plist")
 endforeach()
