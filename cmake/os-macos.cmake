@@ -10,7 +10,7 @@ target_link_libraries(spt-notification PRIVATE Qt::Widgets CEF::Wrapper "$<LINK_
                                           "$<LINK_LIBRARY:FRAMEWORK,AppKit.framework>")
 
 set(helper_basename notification-helper)
-set(helper_output_name "SPECTRUMLiveStudio Helper")
+set(helper_output_name "SpectrumStudio Helper")
 set(helper_suffixes "::" " (GPU):_gpu:.gpu" " (Plugin):_plugin:.plugin" " (Renderer):_renderer:.renderer")
 
 foreach(helper IN LISTS helper_suffixes)
